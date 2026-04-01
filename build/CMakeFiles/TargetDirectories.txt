@@ -1,0 +1,3 @@
+/Users/gelika/VsCode/query_noir/build/CMakeFiles/QueryNoir.dir
+/Users/gelika/VsCode/query_noir/build/CMakeFiles/edit_cache.dir
+/Users/gelika/VsCode/query_noir/build/CMakeFiles/rebuild_cache.dir
