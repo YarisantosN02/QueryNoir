@@ -52,7 +52,7 @@ void apply_cyber_noir() {
     auto neon     = ImVec4(0.000f, 0.831f, 1.000f, 1.0f);
     auto neon_dim = ImVec4(0.000f, 0.831f, 1.000f, 0.35f);
     auto purple   = ImVec4(0.478f, 0.361f, 1.000f, 1.0f);
-    auto red      = ImVec4(1.000f, 0.302f, 0.302f, 1.0f);
+    (void)ImVec4(1.000f, 0.302f, 0.302f, 1.0f); // red — reserved
     auto text     = ImVec4(0.867f, 0.933f, 1.000f, 1.0f);
     auto text_dim = ImVec4(0.502f, 0.651f, 0.800f, 1.0f);
     auto border   = ImVec4(0.000f, 0.831f, 1.000f, 0.20f);

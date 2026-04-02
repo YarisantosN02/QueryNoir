@@ -22,6 +22,8 @@ public:
     // Introspection
     std::vector<std::string> get_table_names();
     std::vector<std::string> get_column_names(const std::string& table);
+    std::vector<std::pair<std::string,std::string>> get_column_info(const std::string& table);
+    int get_row_count(const std::string& table);
 
 private:
     sqlite3*    m_db = nullptr;
