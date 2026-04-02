@@ -33,6 +33,10 @@ public:
     void push_narrative(NarrativeType type, const std::string& text);
     void push_notification(NotifType type, const std::string& msg);
 
+    // Callback registration
+    void on_clue_found(ClueCallback cb)      { m_clue_cb   = cb; }
+    void on_table_unlocked(UnlockCallback cb) { m_unlock_cb = cb; }
+
     // Returns true when player has enough clues to accuse
     bool can_accuse() const;
     // Returns true when case is solved

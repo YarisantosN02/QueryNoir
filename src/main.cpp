@@ -9,6 +9,8 @@
 #include "Types.h"
 #include "GameState.h"
 #include "UITheme.h"
+#include "Audio.h"
+#include "Intro.h"
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -35,6 +37,13 @@ static int    s_hist_idx   = -1;
 static bool   s_focus_q    = true;
 static QueryResult s_result;
 static bool   s_has_result = false;
+
+// ─── Intro ────────────────────────────────────────────────────────────────────
+static IntroState g_intro;
+static bool       g_intro_done = false;
+
+// Track previous query buf length to detect new typing
+static int s_prev_qbuf_len = 0;
 
 // ─── Accusation input ─────────────────────────────────────────────────────────
 static char s_accuse_buf[256] = "";
@@ -405,9 +414,23 @@ static void draw_center(){
 
     if((enter||exec_click)&&strlen(s_qbuf)>0){
         g_state.app().glitch_timer=0.18f;
+        Audio::get().play(SFX::EXECUTE);
+        Audio::get().play(SFX::GLITCH, 0.4f);
         s_result=g_state.run_query(s_qbuf);
+        // Play result-specific sounds
+        if(s_result.is_error)
+            Audio::get().play(SFX::ERROR_BEEP);
         s_has_result=true;
         s_hist_idx=-1;
+    }
+
+    // Key click while typing
+    {
+        int cur_len=(int)strlen(s_qbuf);
+        if(cur_len != s_prev_qbuf_len){
+            Audio::get().play(SFX::KEYCLICK, 0.45f);
+            s_prev_qbuf_len = cur_len;
+        }
     }
 
     if(g_state.app().query_executing){
@@ -796,10 +819,14 @@ static void draw_accuse_modal(){
     ImGui::PopStyleColor(3); ImGui::PopStyleVar(2);
 
     if(submit){
+        Audio::get().play(SFX::ACCUSE, 1.0f);
         bool correct=g_state.try_accuse(s_accuse_buf);
         if(!correct){
             memset(s_accuse_buf,0,sizeof(s_accuse_buf));
             s_accuse_focus=true;
+            Audio::get().play(SFX::ERROR_BEEP, 0.8f);
+        } else {
+            Audio::get().play(SFX::SOLVED, 1.0f);
         }
     }
 
@@ -1042,6 +1069,20 @@ int main(int,char**){
 
     g_state.init_case_orion();
 
+    // ── Audio init ───────────────────────────────────────────────────────────
+    Audio::get().init();
+    Audio::get().play(SFX::TERMINAL_BOOT, 0.7f);
+
+    // Register callbacks so audio plays on clue/unlock events
+    g_state.on_clue_found([](const Clue&){
+        Audio::get().play(SFX::CLUE, 0.9f);
+        Audio::get().set_music_intensity(
+            std::min(1.f, (float)g_state.app().discovered_clues / 6.f));
+    });
+    g_state.on_table_unlocked([](const TableInfo&){
+        Audio::get().play(SFX::UNLOCK, 0.85f);
+    });
+
     Uint64 last=SDL_GetPerformanceCounter();
     bool running=true;
 
@@ -1076,6 +1117,21 @@ int main(int,char**){
 
         SDL_SetRenderDrawColor(ren,9,14,26,255);
         SDL_RenderClear(ren);
+
+        // ── INTRO SEQUENCE ── show until complete ────────────────────────────
+        if(!g_intro_done){
+            g_intro_done = draw_intro(g_intro, dt, g_W, g_H, nullptr);
+            if(g_intro_done){
+                // Transition sound
+                Audio::get().play(SFX::TERMINAL_BOOT, 0.6f);
+                Audio::get().set_music_intensity(0.15f);
+            }
+            if(UITheme::font_mono) ImGui::PopFont();
+            ImGui::Render();
+            ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(),ren);
+            SDL_RenderPresent(ren);
+            continue; // don't render game UI yet
+        }
 
         // Global scanline bg
         {
@@ -1112,6 +1168,7 @@ int main(int,char**){
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
+    Audio::get().shutdown();
     SDL_DestroyRenderer(ren);
     SDL_DestroyWindow(win);
     SDL_Quit();

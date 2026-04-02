@@ -55,6 +55,8 @@ set(GAME_SOURCES
     src/Database.cpp
     src/GameState.cpp
     src/UITheme.cpp
+    src/Audio.cpp
+    src/Intro.cpp
     src/Renderer.cpp
     src/QueryConsole.cpp
     src/NarrativeFeed.cpp

@@ -52,7 +52,7 @@ void apply_cyber_noir() {
     auto neon     = ImVec4(0.000f, 0.831f, 1.000f, 1.0f);
     auto neon_dim = ImVec4(0.000f, 0.831f, 1.000f, 0.35f);
     auto purple   = ImVec4(0.478f, 0.361f, 1.000f, 1.0f);
-    (void)ImVec4(1.000f, 0.302f, 0.302f, 1.0f); // red — reserved
+    auto red      = ImVec4(1.000f, 0.302f, 0.302f, 1.0f);
     auto text     = ImVec4(0.867f, 0.933f, 1.000f, 1.0f);
     auto text_dim = ImVec4(0.502f, 0.651f, 0.800f, 1.0f);
     auto border   = ImVec4(0.000f, 0.831f, 1.000f, 0.20f);
@@ -115,7 +115,7 @@ void apply_cyber_noir() {
     c[ImGuiCol_TableRowBgAlt]        = { 0.f, 0.831f, 1.f, 0.03f };
 
     c[ImGuiCol_TextSelectedBg]       = { 0.f, 0.831f, 1.f, 0.25f };
-    c[ImGuiCol_DragDropTarget]       = neon;
+    c[ImGuiCol_DragDropTarget]       = red;
 
     c[ImGuiCol_NavHighlight]         = neon;
     c[ImGuiCol_NavWindowingHighlight]= { 1,1,1,0.7f };
