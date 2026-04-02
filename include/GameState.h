@@ -60,7 +60,7 @@ private:
     // Internals
     void analyse_query(const std::string& sql, const QueryResult& result);
     void check_clues(const std::string& sql, const QueryResult& result);
-    void check_unlocks(const std::string& sql);
+    void check_unlocks(const std::string& sql, const QueryResult& result);
     void flag_suspicious_rows(QueryResult& result);
     bool sql_mentions(const std::string& sql, const std::string& keyword);
     std::string sql_upper(const std::string& sql);

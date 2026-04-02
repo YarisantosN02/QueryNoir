@@ -411,20 +411,24 @@ static void draw_center(){
 
     struct QC{ const char* lbl; const char* sql; };
     static QC chips[]={
-        {"suspects",       "SELECT * FROM suspects;"},
-        {"access log",     "SELECT * FROM access_logs ORDER BY timestamp;"},
-        {"night only",
-         "SELECT * FROM access_logs "
-         "WHERE timestamp > '2047-03-15 20:00:00' "
+        {"suspects",
+         "SELECT name, alibi, alibi_verified, badge_id, has_master_access FROM suspects;"},
+        {"access log (night)",
+         "SELECT timestamp, badge_id, person_name, location, action, flag\n"
+         "FROM access_logs\n"
+         "WHERE timestamp >= '2047-03-15 19:00:00'\n"
          "ORDER BY timestamp;"},
-        {"victim",         "SELECT * FROM victims;"},
-        {"join logs",
-         "SELECT a.timestamp, a.person_name, a.location, a.action, s.alibi "
-         "FROM access_logs a "
-         "LEFT JOIN suspects s ON a.person_name = s.name "
+        {"victim",
+         "SELECT * FROM victims;"},
+        {"join logs+suspects",
+         "SELECT a.timestamp, a.person_name, a.location, a.action, a.flag,\n"
+         "       s.alibi, s.alibi_verified\n"
+         "FROM access_logs a\n"
+         "LEFT JOIN suspects s ON a.person_name = s.name\n"
+         "WHERE a.timestamp >= '2047-03-15 19:00:00'\n"
          "ORDER BY a.timestamp;"},
-        {"messages",       "SELECT * FROM messages ORDER BY timestamp;"},
-        {"transactions",   "SELECT * FROM transactions ORDER BY timestamp;"},
+        {"employees",
+         "SELECT name, department, job_title, badge_id FROM employees ORDER BY department;"},
     };
 
     ImGui::SameLine(0,8);
@@ -696,15 +700,27 @@ static void draw_solved(){
     ImGui::PushTextWrapPos(mw-56.f);
     ImGui::TextColored(C_DIM(0.55f),"PERPETRATOR:");
     ImGui::SameLine(0,8);
-    ImGui::TextColored(C_RED(0.92f),"Lena Park, Data Analyst");
+    ImGui::TextColored(C_RED(0.92f),"Lena Park  —  Senior Data Analyst");
     ImGui::Spacing();
-    ImGui::TextColored(C_TEXT(0.72f),
-        "Marcus Orion discovered $900,000 in fraudulent transactions — a bribery "
-        "scheme between CFO Hana Mori and contractor Rex Calloway. Mori paid Park "
-        "$12,000 to silence him before he could expose the ledger.\n\n"
-        "Park lured Marcus to Server Room B-7 at 22:30. A stolen MASTER badge "
-        "triggered the override at 02:14 — the exact moment of death.\n\n"
-        "Elena Vasquez arrived at 23:58. Too late.");
+    ImGui::TextColored(C_DIM(0.45f),"ACCESSORY:");
+    ImGui::SameLine(0,8);
+    ImGui::TextColored(C_RED(0.75f),"Hana Mori (ordered the act) + Elena Vasquez (complicit)");
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::TextColored(C_TEXT(0.70f),
+        "Marcus Orion discovered $1.35M in fraudulent vendor payments routed "
+        "from NovaCorp through ExtShell-LLC to Rex Calloway — all approved by "
+        "CFO Hana Mori. The money looped back offshore to Mori herself.\n\n"
+        "Mori paid Lena Park $12,000 to silence Marcus. Park, a former partner "
+        "who still had access to his schedule, arranged the meeting in Server Room B-7 "
+        "at 22:30 — then modified badge MASTER to give herself override access.\n\n"
+        "At 22:15 she messaged an external contact: 'He has the files. "
+        "I cannot let that happen.'\n\n"
+        "Elena Vasquez received Mori's encrypted order at 20:05: "
+        "'The MASTER key is yours.' She arrived at 23:58 — but Park had "
+        "already acted. The MASTER override logged at 02:14 was Park's final move.\n\n"
+        "Carl Bremer flagged the badge tampering in January. His report was buried.");
     ImGui::PopTextWrapPos();
 
     ImGui::Spacing(); ImGui::Spacing();
