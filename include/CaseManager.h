@@ -1,16 +1,16 @@
+#pragma once
 // ═══════════════════════════════════════════════════════════════════════════
 //  QUERY NOIR — Case Manager
-//  Owns case lifecycle logic. Currently loads Case #0447 (The Orion Murder).
-//  Extend here to support a case-selection menu or multiple cases.
+//  Handles case lifecycle: initialisation, future case loading/switching.
+//  Currently wraps init_case_orion(); designed to support multiple cases.
 // ═══════════════════════════════════════════════════════════════════════════
 
-#include "CaseManager.h"
-#include "GameState.h"
+class GameState;
 
 namespace CaseManager {
+    // Load and initialise the first (and currently only) case.
+    void init(GameState& state);
 
-void init(GameState& state){
-    state.init_case_orion();
+    // Future: void load_case(GameState& state, const std::string& case_id);
+    // Future: void reset_case(GameState& state);
 }
-
-} // namespace CaseManager

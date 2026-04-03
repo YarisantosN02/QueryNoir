@@ -52,16 +52,16 @@ set(IMGUI_SOURCES
 # ── Game sources ─────────────────────────────────────────────────────────────
 set(GAME_SOURCES
     src/main.cpp
-    src/Database.cpp
-    src/GameState.cpp
-    src/UITheme.cpp
-    src/Audio.cpp
-    src/Intro.cpp
     src/Renderer.cpp
     src/QueryConsole.cpp
     src/NarrativeFeed.cpp
     src/CaseManager.cpp
     src/AudioManager.cpp
+    src/Database.cpp
+    src/GameState.cpp
+    src/UITheme.cpp
+    src/Audio.cpp
+    src/Intro.cpp
 )
 
 if(SQLITE3_AMALGAMATION)

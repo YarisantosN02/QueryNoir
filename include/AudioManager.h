@@ -1,16 +1,14 @@
+#pragma once
 // ═══════════════════════════════════════════════════════════════════════════
-//  QUERY NOIR — Case Manager
-//  Owns case lifecycle logic. Currently loads Case #0447 (The Orion Murder).
-//  Extend here to support a case-selection menu or multiple cases.
+//  QUERY NOIR — Audio Manager
+//  Wraps the low-level Audio synthesizer with game-specific logic:
+//  callback registration, music intensity tracking, lifecycle.
 // ═══════════════════════════════════════════════════════════════════════════
 
-#include "CaseManager.h"
-#include "GameState.h"
+class GameState;
 
-namespace CaseManager {
-
-void init(GameState& state){
-    state.init_case_orion();
+namespace AudioManager {
+    void init(GameState& state);
+    void shutdown();
+    void on_intro_complete();
 }
-
-} // namespace CaseManager
