@@ -54,10 +54,11 @@ void draw_center(){
     neon_sep(0.16f);
     ImGui::Spacing();
 
-    // Prompt prefix
+    // Retrieve the current case ID from the game state
+    std::string current_id = g_state.get_current_case().id; 
     ImGui::TextColored(C_NEON(0.82f), "noir@forensics");
     ImGui::SameLine(0,0); ImGui::TextColored(C_DIM(0.4f),  ":");
-    ImGui::SameLine(0,0); ImGui::TextColored(C_PURPLE(0.72f), "~/orion");
+    ImGui::SameLine(0,0); ImGui::TextColored(C_PURPLE(0.72f), "~/%s", current_id.c_str());
     ImGui::SameLine(0,0); ImGui::TextColored(C_DIM(0.55f), "$ ");
     ImGui::SameLine(0,6);
 

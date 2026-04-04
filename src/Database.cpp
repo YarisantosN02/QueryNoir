@@ -355,3 +355,148 @@ bool Database::seed_case(const Case&) {
 
     return true;
 }
+
+bool Database::seed_espionage(const Case& c) {
+    // ── Schema ───────────────────────────────────────────────────────────────
+    const std::string schema = R"SQL(
+    CREATE TABLE IF NOT EXISTS project_files (
+        file_id     TEXT PRIMARY KEY,
+        filename    TEXT,
+        size_mb     INTEGER,
+        clearance   TEXT,
+        last_editor TEXT
+    );
+    CREATE TABLE IF NOT EXISTS employees (
+        emp_id      TEXT PRIMARY KEY,
+        name        TEXT,
+        department  TEXT,
+        clearance   TEXT,
+        status      TEXT
+    );
+    CREATE TABLE IF NOT EXISTS network_logs (
+        log_id      INTEGER PRIMARY KEY,
+        ts          TEXT,
+        ip_addr     TEXT,
+        action      TEXT,
+        bytes_mb    INTEGER,
+        flag        TEXT
+    );
+    CREATE TABLE IF NOT EXISTS vpn_registry (
+        emp_id      TEXT,
+        provider    TEXT,
+        assigned_ip TEXT,
+        last_login  TEXT
+    );
+    CREATE TABLE IF NOT EXISTS emails (
+        msg_id      INTEGER PRIMARY KEY,
+        ts          TEXT,
+        sender      TEXT,
+        recipient   TEXT,
+        subject     TEXT,
+        body        TEXT,
+        encrypted   INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS bank_transfers (
+        txn_id      TEXT PRIMARY KEY,
+        ts          TEXT,
+        from_acct   TEXT,
+        to_acct     TEXT,
+        amount      REAL,
+        currency    TEXT,
+        flag        TEXT
+    );
+    CREATE TABLE IF NOT EXISTS decrypted_emails (
+        id          INTEGER PRIMARY KEY,
+        orig_msg_id INTEGER,
+        body        TEXT
+    );
+    CREATE TABLE IF NOT EXISTS security_alerts (
+        alert_id    INTEGER PRIMARY KEY,
+        ts          TEXT,
+        system      TEXT,
+        description TEXT,
+        resolved_by TEXT
+    );
+    )SQL";
+
+    if (execute(schema).is_error) { std::cerr<<"[DB] schema failed\n"; return false; }
+
+    // ── project_files ────────────────────────────────────────────────────────
+    exec1(this,"project_files", R"SQL(
+    INSERT INTO project_files VALUES 
+        ('P-01', 'BLUEBIRD_PROTOTYPE_V1', 1500, 'LEVEL-5', 'Sarah Chen'),
+        ('P-02', 'Q3_FINANCIALS_DRAFT',   12,   'LEVEL-3', 'David Kim'),
+        ('P-03', 'HR_ROSTER_2047',        4,    'LEVEL-2', 'Marcus Vance');
+    )SQL");
+
+    // ── employees ────────────────────────────────────────────────────────────
+    exec1(this,"employees", R"SQL(
+    INSERT INTO employees VALUES
+        ('E-101', 'Sarah Chen',    'R&D',     'LEVEL-5', 'ACTIVE'),
+        ('E-102', 'Marcus Vance',  'Sales',   'LEVEL-2', 'ACTIVE'),
+        ('E-103', 'David Kim',     'IT',      'LEVEL-4', 'ACTIVE'),
+        ('E-104', 'Elena Vasquez', 'Legal',   'LEVEL-5', 'ACTIVE'),
+        ('EXT-1', 'ApexTech_Rep',  'External','NONE',    'N/A');
+    )SQL");
+
+    // ── network_logs ─────────────────────────────────────────────────────────
+    exec1(this,"network_logs", R"SQL(
+    INSERT INTO network_logs VALUES
+        (1, '2047-04-02 01:14', '192.168.1.15', 'LOGIN',      0,    'NORMAL'),
+        (2, '2047-04-02 02:30', '192.168.1.22', 'DATA_PULL',  12,   'NORMAL'),
+        (3, '2047-04-02 03:45', '45.22.11.9',   'DATA_XFER',  1500, 'ANOMALY'),
+        (4, '2047-04-02 03:50', '192.168.1.55', 'SYS_WIPE',   0,    'WARNING'),
+        (5, '2047-04-02 04:00', '192.168.1.15', 'LOGOUT',     0,    'NORMAL');
+    )SQL");
+
+    // ── vpn_registry ─────────────────────────────────────────────────────────
+    exec1(this,"vpn_registry", R"SQL(
+    INSERT INTO vpn_registry VALUES
+        ('E-102', 'CorpNet',       '192.168.1.22', '2047-04-02 02:00'),
+        ('E-101', 'GhostProtocol', '45.22.11.9',   '2047-04-02 03:40'),
+        ('E-103', 'SafeSurf',      '192.168.1.55', '2047-04-02 03:48');
+    )SQL");
+
+    // ── emails ───────────────────────────────────────────────────────────────
+    exec1(this,"emails", R"SQL(
+    INSERT INTO emails VALUES
+        (1, '2047-04-01 09:00', 'E-101', 'E-103', 'Server Maint', 'Please clear the audit logs tonight.', 0),
+        (2, '2047-04-01 14:22', 'E-103', 'E-101', 'Re: Maint', 'Will do. I will run the SYS_WIPE at 03:50.', 0),
+        (3, '2047-04-01 18:30', 'E-101', 'EXT-1', 'Delivery', '[ENCRYPTED PAYLOAD]', 1),
+        (4, '2047-04-02 04:10', 'EXT-1', 'E-101', 'Confirmation', 'The bird has flown. Funds transferred.', 0);
+    )SQL");
+
+    // ── bank_transfers ───────────────────────────────────────────────────────
+    exec1(this,"bank_transfers", R"SQL(
+    INSERT INTO bank_transfers VALUES
+        ('TX-991', '2047-04-01 10:00', 'NovaCorp', 'E-101', 5000,   'USD', 'PAYROLL'),
+        ('TX-992', '2047-04-02 04:05', 'ApexTech', 'Shell-77', 500000, 'USD', 'WIRE'),
+        ('TX-993', '2047-04-02 04:30', 'Shell-77', 'E-101', 450000, 'USD', 'WIRE_FWD'),
+        ('TX-994', '2047-04-02 04:35', 'Shell-77', 'E-103', 50000,  'USD', 'WIRE_FWD');
+    )SQL");
+
+    // ── decrypted_emails ─────────────────────────────────────────────────────
+    exec1(this,"decrypted_emails", R"SQL(
+    INSERT INTO decrypted_emails VALUES
+        (1, 3, 'I am initiating the 1.5GB transfer of Bluebird tonight via GhostProtocol. David is handling the log wipes.');
+    )SQL");
+
+    // ── security_alerts ──────────────────────────────────────────────────────
+    exec1(this,"security_alerts", R"SQL(
+    INSERT INTO security_alerts VALUES
+        (101, '2047-04-02 03:45', 'FIREWALL', 'Massive outbound data spike detected (1500MB).', 'E-103'),
+        (102, '2047-04-02 03:50', 'SYS_MON',  'Manual audit log wipe initiated.', 'E-103');
+    )SQL");
+
+    // Verify all tables have data
+    auto check = [&](const char* t, int expected) {
+        int n = get_row_count(t);
+        if (n < expected)
+            std::cerr << "[DB] WARNING: " << t << " has " << n << " rows (expected " << expected << ")\n";
+    };
+    check("project_files", 3); check("employees", 5); check("network_logs", 5);
+    check("vpn_registry", 3); check("emails", 4); check("bank_transfers", 4);
+    check("decrypted_emails", 1); check("security_alerts", 2);
+
+    return true;
+}

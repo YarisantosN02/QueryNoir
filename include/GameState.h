@@ -13,6 +13,7 @@ class GameState {
 public:
     GameState();
     void init_case_orion();
+    void init_case_espionage();
 
     // Main entry point — runs query, checks puzzles, returns displayable result
     QueryResult run_query(const std::string& sql);
@@ -28,8 +29,10 @@ public:
     std::vector<Clue>&           clues() { return m_clues; }
     std::vector<std::string>&    history(){ return m_query_history; }
     const QueryResult&           last_result() const { return m_last_result; }
+    const Case&                  get_current_case() const { return m_current_case; }
 
     void update(float dt);
+    void reset();
     void push_narrative(NarrativeType type, const std::string& text);
     void push_notification(NotifType type, const std::string& msg);
 
@@ -53,6 +56,7 @@ private:
     std::vector<std::string>   m_query_history;
     ClueCallback               m_clue_cb;
     UnlockCallback             m_unlock_cb;
+    Case                       m_current_case;
 
     // Puzzle engine
     void check_puzzles(const std::string& sql, const QueryResult& result);

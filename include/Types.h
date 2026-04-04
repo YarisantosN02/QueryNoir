@@ -76,7 +76,22 @@ struct Clue {
 };
 
 // ─── Case ────────────────────────────────────────────────────────────────────
-struct Case { std::string id, title; };
+struct Case {
+    std::string id;
+    std::string title;
+    std::string help_objective;
+    std::string accusation_prompt; 
+    std::string resolved_title;   
+    std::string charged_name;     
+    std::string accessory_name;   
+    std::string resolution_text;
+
+    const std::string& get_accusation_prompt() const { return accusation_prompt; }
+    const std::string& get_resolved_title() const { return resolved_title; }
+    const std::string& get_charged_name() const { return charged_name; }
+    const std::string& get_accessory_name() const { return accessory_name; }
+    const std::string& get_resolution_text() const { return resolution_text; }
+};
 
 // ─── Accusation ───────────────────────────────────────────────────────────────
 struct AccuseState {

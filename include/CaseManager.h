@@ -5,12 +5,12 @@
 //  Currently wraps init_case_orion(); designed to support multiple cases.
 // ═══════════════════════════════════════════════════════════════════════════
 
-class GameState;
+#include <string>
+#include "GameState.h"
 
 namespace CaseManager {
     // Load and initialise the first (and currently only) case.
     void init(GameState& state);
-
-    // Future: void load_case(GameState& state, const std::string& case_id);
-    // Future: void reset_case(GameState& state);
+    void load_case(GameState& state, const std::string& case_id);
+    void reset_case(GameState& state);
 }

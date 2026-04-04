@@ -18,6 +18,7 @@ public:
 
     // Seeding — called once to create the in-memory case DB
     bool        seed_case(const Case& c);
+    bool        seed_espionage(const Case& c);
 
     // Introspection
     std::vector<std::string> get_table_names();

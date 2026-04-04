@@ -42,6 +42,28 @@ GameState::GameState() {}
 // ─────────────────────────────────────────────────────────────────────────────
 void GameState::init_case_orion() {
     m_db.open(":memory:");
+    m_current_case.id = "orion";
+    m_current_case.title = "THE ORION MURDER";
+    m_current_case.help_objective = "Collect at least 5 pieces of evidence including badge tampering and the pre-murder message. Then click ACCUSE and name the killer.";
+    m_current_case.accusation_prompt = 
+        "You have enough evidence. Type the full name of the person you believe "
+        "murdered Marcus Orion. A wrong accusation costs you.";
+    m_current_case.resolved_title = "THE ORION MURDER -- RESOLVED";
+    m_current_case.charged_name   = "Lena Park -- Senior Data Analyst";
+    m_current_case.accessory_name = "Hana Mori (ordered the act)";
+    m_current_case.resolution_text = 
+        "Marcus Orion found $1.35M in fraudulent vendor payments routed from NovaCorp through "
+        "ExtShell-LLC to Rex Calloway, looping offshore back to Mori. He planned to expose it "
+        "that night.\n\n"
+        "Mori paid Park $12,000 to stop him. Park modified badge MASTER two months prior, giving "
+        "herself override access she had no right to. At 22:15 she messaged an external contact: "
+        "'Tonight is the only chance.'\n\n"
+        "She met Marcus in Server Room B-7 at 22:30. He never left.\n\n"
+        "Elena Vasquez received Mori's order at 20:05. She arrived at 23:58 -- too late. Park "
+        "had already used the MASTER override at 02:14.\n\n"
+        "Carl Bremer flagged the badge tampering in January. Vasquez buried the report.";
+
+    m_db.seed_case(m_current_case);
     Case c; c.id="orion"; c.title="THE ORION MURDER";
     m_db.seed_case(c);
 
@@ -328,35 +350,58 @@ void GameState::check_unlocks(const std::string& sql, const QueryResult& result)
         }
     };
 
-    // badge_registry unlocks when player queries access_logs
-    // AND their query returns the MASTER or AFTER_HOURS flag (shows they looked at flags)
-    if (sql_has(up,"ACCESS_LOGS") &&
-        (result_has_cell(result,"MASTER") || result_has_cell(result,"AFTER_HOURS")
-         || result_has_cell(result,"CRITICAL") || result_has_cell(result,"ANOMALY")))
-        unlock("badge_registry");
+    // ── ORION CASE LOGIC ──
+    if (m_current_case.id == "orion") {
+        // badge_registry unlocks when player queries access_logs
+        if (sql_has(up,"ACCESS_LOGS") &&
+            (result_has_cell(result,"MASTER") || result_has_cell(result,"AFTER_HOURS")
+             || result_has_cell(result,"CRITICAL") || result_has_cell(result,"ANOMALY")))
+            unlock("badge_registry");
 
-    // messages unlocks when player queries badge_registry and finds L-019 on MASTER row
-    if (sql_has(up,"BADGE_REGISTRY") &&
-        result_has_cell(result,"L-019") &&
-        result_has_cell(result,"MASTER"))
-        unlock("messages");
+        // messages unlocks when player queries badge_registry and finds L-019
+        if (sql_has(up,"BADGE_REGISTRY") &&
+            result_has_cell(result,"L-019") &&
+            result_has_cell(result,"MASTER"))
+            unlock("messages");
 
-    // transactions unlocks when player finds Lena's 22:15 message
-    // (must filter messages to see it — not just SELECT *)
-    if (sql_has(up,"MESSAGES") && !sql_has(up,"DECRYPTED") &&
-        result_has_cell(result,"Proceeding"))
-        unlock("transactions");
+        // transactions unlocks when player finds Lena's 22:15 message
+        if (sql_has(up,"MESSAGES") && !sql_has(up,"DECRYPTED") &&
+            result_has_cell(result,"Proceeding"))
+            unlock("transactions");
 
-    // incident_reports unlocks when player finds the Mori->Park transaction
-    if (sql_has(up,"TRANSACTIONS") &&
-        result_has_cell(result,"Mori-Personal"))
-        unlock("incident_reports");
+        // incident_reports unlocks when player finds the Mori->Park transaction
+        if (sql_has(up,"TRANSACTIONS") &&
+            result_has_cell(result,"Mori-Personal"))
+            unlock("incident_reports");
 
-    // decrypted_messages unlocks ONLY when player finds the key "BLACK-OMEGA-7"
-    // either by reading incident_reports carefully, or by typing the key in a query
-    if ((sql_has(up,"INCIDENT_REPORTS") && result_has_cell(result,"BLACK-OMEGA-7")) ||
-        sql_has(up,"BLACK-OMEGA-7"))
-        unlock("decrypted_messages");
+        // decrypted_messages unlocks ONLY when player finds the key "BLACK-OMEGA-7"
+        if ((sql_has(up,"INCIDENT_REPORTS") && result_has_cell(result,"BLACK-OMEGA-7")) ||
+            sql_has(up,"BLACK-OMEGA-7"))
+            unlock("decrypted_messages");
+    }
+    
+    // ── BLUEBIRD / ESPIONAGE CASE LOGIC ──
+    else if (m_current_case.id == "espionage") {
+        // Unlock security_alerts when player finds the 1500MB anomaly
+        if (sql_has(up, "NETWORK_LOGS") && result_has_cell(result, "1500"))
+            unlock("security_alerts");
+
+        // Unlock vpn_registry when player finds David Kim (E-103) clearing alerts
+        if (sql_has(up, "SECURITY_ALERTS") && result_has_cell(result, "E-103"))
+            unlock("vpn_registry");
+
+        // Unlock emails when player finds Sarah Chen's (E-101) IP address
+        if (sql_has(up, "VPN_REGISTRY") && result_has_cell(result, "E-101"))
+            unlock("emails");
+
+        // Unlock bank_transfers when player finds the SYS_WIPE email
+        if (sql_has(up, "EMAILS") && result_has_cell(result, "SYS_WIPE"))
+            unlock("bank_transfers");
+
+        // Unlock decrypted_emails when player finds the ApexTech transfer
+        if (sql_has(up, "BANK_TRANSFERS") && result_has_cell(result, "ApexTech"))
+            unlock("decrypted_emails");
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -376,100 +421,159 @@ void GameState::add_context_narrative(const std::string& sql, const QueryResult&
                            !sql_has(up,"JOIN") && !sql_has(up,"GROUP BY") &&
                            !sql_has(up,"HAVING");
 
-    if (sql_has(up,"ACCESS_LOGS")) {
-        if (is_naked_select && rows > 15)
-            push_narrative(NarrativeType::HINT,
-                "You're seeing all "+std::to_string(rows)+" rows. "
-                "Narrow it — filter by zone, action, or flag. "
-                "You're looking for something specific.");
-        else if (sql_has(up,"FLAG") && result_has_cell(result,"ANOMALY"))
+    // ── 2. ORION CASE LOGIC ──
+    if (m_current_case.id == "orion") {
+        if (sql_has(up,"ACCESS_LOGS")) {
+            if (is_naked_select && rows > 15)
+                push_narrative(NarrativeType::HINT,
+                    "You're seeing all "+std::to_string(rows)+" rows. "
+                    "Narrow it — filter by zone, action, or flag. "
+                    "You're looking for something specific.");
+            else if (sql_has(up,"FLAG") && result_has_cell(result,"ANOMALY"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "ANOMALY. Orion was flagged in the Finance Suite. "
+                    "What was he looking at in there?");
+            else if (result_has_cell(result,"CRITICAL"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "02:14. CRITICAL override. MASTER badge. "
+                    "That's not an access card — it's a skeleton key. Who controls it?");
+            else if (result_has_cell(result,"22:30"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "22:30 — Lena Park. 22:31 — Marcus Orion. "
+                    "One minute apart. Same room. She was already there waiting.");
+        }
+
+        if (sql_has(up,"BADGE_REGISTRY")) {
+            if (is_naked_select)
+                push_narrative(NarrativeType::HINT,
+                    "8 badge records. Find the MASTER badge specifically. "
+                    "Try: WHERE badge_id = 'MASTER'");
+            else if (result_has_cell(result,"L-019") && result_has_cell(result,"MASTER"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "L-019 modified the MASTER badge. "
+                    "L-019 is Lena Park. She has no admin rights. "
+                    "How did she do this — and why did nobody stop it?");
+        }
+
+        if (sql_has(up,"MESSAGES") && !sql_has(up,"DECRYPTED")) {
+            if (is_naked_select)
+                push_narrative(NarrativeType::HINT,
+                    "12 messages — half are noise, three are encrypted. "
+                    "Filter by sender or timestamp. "
+                    "Try: WHERE sender = 'Lena Park'  or  WHERE encrypted = 0");
+            else if (result_has_cell(result,"[ENCRYPTED]"))
+                push_narrative(NarrativeType::HINT,
+                    "Encrypted messages. You need a key. "
+                    "It's not in this table — it's buried in the paper trail.");
+            else if (result_has_cell(result,"Proceeding"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "22:15. 'Tonight is the only chance to stop this. Proceeding.' "
+                    "Fifteen minutes before the meeting. "
+                    "She had already decided.");
+        }
+
+        if (sql_has(up,"TRANSACTIONS")) {
+            if (is_naked_select)
+                push_narrative(NarrativeType::HINT,
+                    "16 rows — mostly payroll. "
+                    "Filter it: WHERE category = 'Vendor-Consulting'  or  WHERE from_acct LIKE '%Mori%'. "
+                    "The interesting rows are buried.");
+            else if (result_has_cell(result,"RCCalloway-Private"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "ExtShell-LLC, then straight to Calloway's private account. "
+                    "Approved by Mori. $1.35 million across six months. "
+                    "Marcus found this ledger. That's what got him killed.");
+            else if (result_has_cell(result,"Mori-Personal"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "Mori-Personal to LPark-Account. $12,000. March 1st. "
+                    "'Personal' category. Park cashed it 9 days later. "
+                    "This is a payment, not a bonus.");
+        }
+
+        if (sql_has(up,"INCIDENT_REPORTS")) {
+            if (is_naked_select)
+                push_narrative(NarrativeType::HINT,
+                    "4 reports. One of them has something hidden inside it. "
+                    "Try: WHERE filed_by = 'Carl Bremer'");
+            else if (result_has_cell(result,"BLACK-OMEGA-7"))
+                push_narrative(NarrativeType::SUCCESS,
+                    "BLACK-OMEGA-7. That's the decryption key for the encrypted messages. "
+                    "Use it: SELECT * FROM decrypted_messages;");
+            else if (result_has_cell(result,"E.Vasquez"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "Vasquez closed the report. She buried the evidence "
+                    "of Lena Park tampering with the MASTER badge.");
+        }
+
+        if (sql_has(up,"DECRYPTED_MESSAGES")) {
             push_narrative(NarrativeType::MONOLOGUE,
-                "ANOMALY. Orion was flagged in the Finance Suite. "
-                "What was he looking at in there?");
-        else if (result_has_cell(result,"CRITICAL"))
-            push_narrative(NarrativeType::MONOLOGUE,
-                "02:14. CRITICAL override. MASTER badge. "
-                "That's not an access card — it's a skeleton key. Who controls it?");
-        else if (result_has_cell(result,"22:30"))
-            push_narrative(NarrativeType::MONOLOGUE,
-                "22:30 — Lena Park. 22:31 — Marcus Orion. "
-                "One minute apart. Same room. She was already there waiting.");
+                "Read them in order. Three messages. The last one is the order.");
+        }
+
+        if (sql_has(up,"SUSPECTS")) {
+            if (is_naked_select)
+                push_narrative(NarrativeType::HINT,
+                    "Five suspects. Check alibi_status — two say UNVERIFIED. "
+                    "The logs can confirm or deny every alibi.");
+        }
     }
 
-    if (sql_has(up,"BADGE_REGISTRY")) {
-        if (is_naked_select)
-            push_narrative(NarrativeType::HINT,
-                "8 badge records. Find the MASTER badge specifically. "
-                "Try: WHERE badge_id = 'MASTER'");
-        else if (result_has_cell(result,"L-019") && result_has_cell(result,"MASTER"))
-            push_narrative(NarrativeType::MONOLOGUE,
-                "L-019 modified the MASTER badge. "
-                "L-019 is Lena Park. She has no admin rights. "
-                "How did she do this — and why did nobody stop it?");
+    // ── 3. BLUEBIRD (ESPIONAGE) CASE LOGIC ──
+    else if (m_current_case.id == "espionage") {
+        
+        if (sql_has(up, "NETWORK_LOGS")) {
+            if (is_naked_select && rows > 10)
+                push_narrative(NarrativeType::HINT,
+                    "Thousands of packets. Look for anomalies or massive transfers. "
+                    "Filter by action or bytes.");
+            else if (result_has_cell(result, "1500"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "1500 MB. Exactly the size of the Bluebird prototype. "
+                    "Someone backed up a truck to the servers at 03:45.");
+        }
+        
+        if (sql_has(up, "SECURITY_ALERTS")) {
+            if (is_naked_select)
+                push_narrative(NarrativeType::HINT,
+                    "Check who was on duty to clear the alerts around the time of the leak.");
+            else if (result_has_cell(result, "E-103"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "E-103 manually resolved the alert. That's David Kim in IT. "
+                    "He didn't just clear it, he wiped the logs.");
+        }
+
+        if (sql_has(up, "VPN_REGISTRY")) {
+            if (is_naked_select)
+                push_narrative(NarrativeType::HINT,
+                    "Match the anomalous IP from the network logs to a specific session.");
+            else if (result_has_cell(result, "45.22.11.9"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "IP 45.22.11.9 maps to E-101. Sarah Chen. "
+                    "She pulled the trigger, but David held the door open.");
+        }
+
+        if (sql_has(up, "EMAILS")) {
+            if (is_naked_select)
+                push_narrative(NarrativeType::HINT,
+                    "Too much noise. Search for communications involving E-103 or specific keywords.");
+            else if (result_has_cell(result, "SYS_WIPE"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "SYS_WIPE confirmed hours in advance. "
+                    "This wasn't opportunistic. It was highly coordinated.");
+        }
+
+        if (sql_has(up, "BANK_TRANSFERS")) {
+            if (is_naked_select)
+                push_narrative(NarrativeType::HINT,
+                    "Filter by large amounts or unknown entities. Someone got paid.");
+            else if (result_has_cell(result, "ApexTech"))
+                push_narrative(NarrativeType::MONOLOGUE,
+                    "Half a million dollars from ApexTech. Corporate espionage confirmed. "
+                    "Follow the money trail from Shell-77 to see who got paid.");
+        }
     }
 
-    if (sql_has(up,"MESSAGES") && !sql_has(up,"DECRYPTED")) {
-        if (is_naked_select)
-            push_narrative(NarrativeType::HINT,
-                "12 messages — half are noise, three are encrypted. "
-                "Filter by sender or timestamp. "
-                "Try: WHERE sender = 'Lena Park'  or  WHERE encrypted = 0");
-        else if (result_has_cell(result,"[ENCRYPTED]"))
-            push_narrative(NarrativeType::HINT,
-                "Encrypted messages. You need a key. "
-                "It's not in this table — it's buried in the paper trail.");
-        else if (result_has_cell(result,"Proceeding"))
-            push_narrative(NarrativeType::MONOLOGUE,
-                "22:15. 'Tonight is the only chance to stop this. Proceeding.' "
-                "Fifteen minutes before the meeting. "
-                "She had already decided.");
-    }
-
-    if (sql_has(up,"TRANSACTIONS")) {
-        if (is_naked_select)
-            push_narrative(NarrativeType::HINT,
-                "16 rows — mostly payroll. "
-                "Filter it: WHERE category = 'Vendor-Consulting'  or  WHERE from_acct LIKE '%Mori%'. "
-                "The interesting rows are buried.");
-        else if (result_has_cell(result,"RCCalloway-Private"))
-            push_narrative(NarrativeType::MONOLOGUE,
-                "ExtShell-LLC, then straight to Calloway's private account. "
-                "Approved by Mori. $1.35 million across six months. "
-                "Marcus found this ledger. That's what got him killed.");
-        else if (result_has_cell(result,"Mori-Personal"))
-            push_narrative(NarrativeType::MONOLOGUE,
-                "Mori-Personal to LPark-Account. $12,000. March 1st. "
-                "'Personal' category. Park cashed it 9 days later. "
-                "This is a payment, not a bonus.");
-    }
-
-    if (sql_has(up,"INCIDENT_REPORTS")) {
-        if (is_naked_select)
-            push_narrative(NarrativeType::HINT,
-                "4 reports. One of them has something hidden inside it. "
-                "Try: WHERE filed_by = 'Carl Bremer'");
-        else if (result_has_cell(result,"BLACK-OMEGA-7"))
-            push_narrative(NarrativeType::SUCCESS,
-                "BLACK-OMEGA-7. That's the decryption key for the encrypted messages. "
-                "Use it: SELECT * FROM decrypted_messages;");
-        else if (result_has_cell(result,"E.Vasquez"))
-            push_narrative(NarrativeType::MONOLOGUE,
-                "Vasquez closed the report. She buried the evidence "
-                "of Lena Park tampering with the MASTER badge.");
-    }
-
-    if (sql_has(up,"DECRYPTED_MESSAGES")) {
-        push_narrative(NarrativeType::MONOLOGUE,
-            "Read them in order. Three messages. The last one is the order.");
-    }
-
-    if (sql_has(up,"SUSPECTS")) {
-        if (is_naked_select)
-            push_narrative(NarrativeType::HINT,
-                "Five suspects. Check alibi_status — two say UNVERIFIED. "
-                "The logs can confirm or deny every alibi.");
-    }
-
+    // ── 4. Shared Mechanics (Both Cases) ──
     if (sql_has(up,"JOIN"))
         push_narrative(NarrativeType::MONOLOGUE,
             "Good. Connecting tables is how you see what doesn't fit.");
@@ -492,6 +596,11 @@ void GameState::flag_rows(QueryResult& result) {
         "Park is handling it",  // direct quote from decrypted msg
         "MASTER key is hers",
         "cannot be allowed",
+        "1500",             // The massive exfiltration
+        "SYS_WIPE",         // The premeditated cover-up command
+        "ApexTech",         // The rival company
+        "Shell-77",         // The dummy account
+        "GhostProtocol",    // The illicit VPN session
     };
     for (size_t i=0; i<result.rows.size(); i++) {
         for (auto& cell : result.rows[i]) {
@@ -515,39 +624,77 @@ bool GameState::try_accuse(const std::string& name) {
     while (!n.empty() && n.front()==' ') n=n.substr(1);
     while (!n.empty() && n.back()==' ')  n.pop_back();
 
-    // Correct answer: Lena Park (accept variations)
-    if (n == "LENA PARK" || n == "PARK" || n == "L-019" || n == "LENA") {
-        m_app.status = GameStatus::CASE_SOLVED;
-        push_narrative(NarrativeType::SUCCESS,
-            "CASE CLOSED. Lena Park. Charged with first-degree murder.");
-        return true;
+    // ── 1. ORION CASE LOGIC ──
+    if (m_current_case.id == "orion") {
+        // Correct answer: Lena Park (accept variations)
+        if (n == "LENA PARK" || n == "Lena" || n == "L-019" || n == "LENA") {
+            m_app.status = GameStatus::CASE_SOLVED;
+            push_narrative(NarrativeType::SUCCESS,
+                "CASE CLOSED. Lena Park. Charged with first-degree murder.");
+            return true;
+        }
+
+        // Wrong — give specific reactive feedback
+        m_app.accuse.wrong_timer = 4.f;
+        if (n == "HANA MORI" || n == "MORI")
+            m_app.accuse.wrong_feedback =
+                "Mori ordered it — but didn't pull the trigger. "
+                "The access logs put someone else in that room.";
+        else if (n == "ELENA VASQUEZ" || n == "VASQUEZ")
+            m_app.accuse.wrong_feedback =
+                "Vasquez received orders and arrived at 23:58 — but Lena Park "
+                "was already in the room since 22:30. Check who exited when.";
+        else if (n == "DORIAN KAST" || n == "KAST" || n == "DORIAN")
+            m_app.accuse.wrong_feedback =
+                "Kast left the building at 21:47. His alibi is partial but "
+                "he had no motive strong enough — and no access to MASTER.";
+        else if (n == "REX CALLOWAY" || n == "CALLOWAY" || n == "REX")
+            m_app.accuse.wrong_feedback =
+                "Calloway is dirty — but he was at the hotel. "
+                "He's the beneficiary, not the one who did this.";
+        else
+            m_app.accuse.wrong_feedback =
+                "'" + name + "' is not a match. Review your evidence. "
+                "You need to be certain.";
+
+        push_narrative(NarrativeType::ALERT,
+            "Wrong. " + m_app.accuse.wrong_feedback);
+        return false;
     }
 
-    // Wrong — give specific reactive feedback
-    m_app.accuse.wrong_timer = 4.f;
-    if (n == "HANA MORI" || n == "MORI")
-        m_app.accuse.wrong_feedback =
-            "Mori ordered it — but didn't pull the trigger. "
-            "The access logs put someone else in that room.";
-    else if (n == "ELENA VASQUEZ" || n == "VASQUEZ")
-        m_app.accuse.wrong_feedback =
-            "Vasquez received orders and arrived at 23:58 — but Lena Park "
-            "was already in the room since 22:30. Check who exited when.";
-    else if (n == "DORIAN KAST" || n == "KAST" || n == "DORIAN")
-        m_app.accuse.wrong_feedback =
-            "Kast left the building at 21:47. His alibi is partial but "
-            "he had no motive strong enough — and no access to MASTER.";
-    else if (n == "REX CALLOWAY" || n == "CALLOWAY" || n == "REX")
-        m_app.accuse.wrong_feedback =
-            "Calloway is dirty — but he was at the hotel. "
-            "He's the beneficiary, not the one who did this.";
-    else
-        m_app.accuse.wrong_feedback =
-            "'" + name + "' is not a match. Review your evidence. "
-            "You need to be certain.";
+    // ── 2. BLUEBIRD (ESPIONAGE) CASE LOGIC ──
+    else if (m_current_case.id == "espionage") {
+        // Correct answers: Sarah Chen (Leaker) or David Kim (Accomplice)
+        if (n == "SARAH CHEN" || n == "CHEN" || n == "E-101" || n == "SARAH") {
+            m_app.status = GameStatus::CASE_SOLVED;
+            push_narrative(NarrativeType::SUCCESS,
+                "CASE CLOSED. Sarah Chen. Arrested for corporate espionage and grand larceny.");
+            return true;
+        } else if (n == "DAVID KIM" || n == "KIM" || n == "E-103" || n == "DAVID") {
+            m_app.status = GameStatus::CASE_SOLVED;
+            push_narrative(NarrativeType::SUCCESS,
+                "CASE CLOSED. David Kim. Arrested for accessory to espionage and tampering with evidence.");
+            return true;
+        }
 
-    push_narrative(NarrativeType::ALERT,
-        "Wrong. " + m_app.accuse.wrong_feedback);
+        // Wrong — give specific reactive feedback
+        m_app.accuse.wrong_timer = 4.f;
+        if (n == "APEXTECH" || n == "APEX") {
+            m_app.accuse.wrong_feedback = 
+                "They bought the data, but you need to arrest the employee who sold it.";
+        } else if (n == "GHOSTPROTOCOL" || n == "GHOST") {
+            m_app.accuse.wrong_feedback = 
+                "That's the VPN session, not a person. Cross-reference the IP to an employee.";
+        } else {
+            m_app.accuse.wrong_feedback =
+                "'" + name + "' is not a match. Review the IP logs and bank transfers.";
+        }
+
+        push_narrative(NarrativeType::ALERT,
+            "Wrong. " + m_app.accuse.wrong_feedback);
+        return false;
+    }
+
     return false;
 }
 
@@ -599,4 +746,140 @@ void GameState::update(float dt) {
         m_notifications.end());
 }
 
+void GameState::reset() {
+    m_tables.clear();
+    m_clues.clear();
+    m_feed.clear();
+    m_notifications.clear();
+    m_query_history.clear();
+    m_app.discovered_clues = 0;
+}
+
+std::string get_terminal_prompt(const GameState& state) {
+    std::string user = "noir";
+    std::string host = "forensics";
+    std::string current_dir = state.get_current_case().id; 
+    return user + "@" + host + ":~/" + current_dir + "$ ";
+}
+
+void GameState::init_case_espionage() {
+    m_db.open(":memory:");
+    m_current_case.id = "espionage";
+    m_current_case.title = "PROJECT BLUEBIRD";
+    m_current_case.help_objective = "Identify the employee who leaked the Bluebird prototype. Find their accomplice in IT and follow the money. Collect 8 clues, then click ACCUSE.";
+    m_current_case.accusation_prompt = 
+        "You have enough evidence. Type the full name of the employee who leaked "
+        "Project Bluebird, or their IT accomplice. A wrong accusation costs you.";
+    m_current_case.resolved_title = "PROJECT BLUEBIRD -- RESOLVED";
+    m_current_case.charged_name   = "Sarah Chen (E-101) -- Lead Engineer";
+    m_current_case.accessory_name = "David Kim (E-103) (IT accomplice & cover-up)";
+    m_current_case.resolution_text = 
+        "ApexTech wired $500,000 to a dummy account (Shell-77) to purchase the proprietary "
+        "Bluebird prototype. Sarah Chen accepted the bribe, keeping $450,000 and paying a $50,000 "
+        "cut to David Kim in IT to cover her tracks.\n\n"
+        "At 14:22, Kim confirmed he would run a 'SYS_WIPE' during the graveyard shift. "
+        "Using a GhostProtocol VPN session masking as IP 45.22.11.9, Chen pulled the 1500MB "
+        "payload directly from the secure servers at 03:45.\n\n"
+        "When the massive data spike triggered a firewall security alert, Kim manually "
+        "resolved the warning at 03:50 and wiped the system logs as planned.\n\n"
+        "The data is already in ApexTech's hands, but the internal leak has been permanently plugged.";
+    m_db.seed_espionage(m_current_case);
+
+    // ── Tables ──
+    m_tables = {
+        {"project_files",   "PROJECT FILES",      true,  "", {}, "📁"},
+        {"employees",       "ROSTER",             true,  "", {}, "👤"},
+        {"network_logs",    "NETWORK TRAFFIC",    true,  "", {}, "📡"},
+        {"security_alerts", "SECURITY ALERTS",    false, "Find the 'ANOMALY' in network_logs", {}, "🚨"},
+        {"vpn_registry",    "VPN REGISTRY",       false, "Identify who resolved the firewall alert", {}, "🔐"},
+        {"emails",          "EMAILS",             false, "Trace the VPN IP to a specific employee", {}, "✉"},
+        {"bank_transfers",  "FINANCIALS",         false, "Find the payment confirmation in emails", {}, "$"},
+        {"decrypted_emails","DECRYPTED COMMS",    false, "Find the $500,000 ApexTech wire transfer", {}, "⚿"},
+    };
+
+    // Populate schema info for unlocked tables
+    for (auto& t : m_tables) {
+        if (t.unlocked) {
+            auto cols = m_db.get_column_info(t.name);
+            for (auto& [name,type] : cols)
+                t.columns.push_back({name, type, ""});
+            t.row_count = m_db.get_row_count(t.name);
+        }
+    }
+
+    // ── Clues ──
+    m_clues.clear();
+
+    {
+        Clue c; c.id = "c1"; c.title = "The 1.5GB Exfiltration";
+        c.hint = "Check network_logs for any flagged anomalies or large transfers.";
+        c.description = "A massive 1500MB transfer was executed at 03:45 to IP 45.22.11.9. This matches the exact size of the Bluebird prototype.";
+        c.condition.sql_must_contain = {"NETWORK_LOGS", "ANOMALY"};
+        c.condition.result_must_contain_cell = "1500";
+        m_clues.push_back(c);
+    }
+    {
+        Clue c; c.id = "c2"; c.title = "The IT Cover-Up";
+        c.hint = "Check security_alerts. Who cleared the firewall warning at 03:45?";
+        c.description = "David Kim (E-103) manually resolved the massive data spike alert and wiped the system logs at 03:50 to hide the tracks.";
+        c.condition.sql_must_contain = {"SECURITY_ALERTS", "E-103"};
+        c.condition.result_must_contain_cell = "E-103";
+        m_clues.push_back(c);
+    }
+    {
+        Clue c; c.id = "c3"; c.title = "The Ghost Protocol";
+        c.hint = "Query vpn_registry. Who was assigned the IP 45.22.11.9 during the leak?";
+        c.description = "The anomalous IP belongs to a 'GhostProtocol' VPN session initiated by E-101 (Sarah Chen). She pulled the data.";
+        c.condition.sql_must_contain = {"VPN_REGISTRY", "45.22.11.9"};
+        c.condition.result_must_contain_cell = "E-101";
+        m_clues.push_back(c);
+    }
+    {
+        Clue c; c.id = "c4"; c.title = "Pre-Planned Wipe";
+        c.hint = "Check emails between Sarah and David before the incident.";
+        c.description = "At 14:22, David confirmed to Sarah that he would run a 'SYS_WIPE' at 03:50. They planned the cover-up hours in advance.";
+        c.condition.sql_must_contain = {"EMAILS", "E-103"};
+        c.condition.result_must_contain_cell = "SYS_WIPE";
+        m_clues.push_back(c);
+    }
+    {
+        Clue c; c.id = "c5"; c.title = "ApexTech Payout";
+        c.hint = "In bank_transfers, look for massive wires from competitors.";
+        c.description = "ApexTech wired $500,000 to a dummy account (Shell-77) just minutes after the data was successfully exfiltrated.";
+        c.condition.sql_must_contain = {"BANK_TRANSFERS", "APEXTECH"};
+        c.condition.result_must_contain_cell = "Shell-77";
+        m_clues.push_back(c);
+    }
+    {
+        Clue c; c.id = "c6"; c.title = "Splitting the Bribe";
+        c.hint = "Trace where Shell-77 sent the money in bank_transfers.";
+        c.description = "The $500k bribe was split: $450k forwarded directly to Sarah Chen (E-101), and a $50k cut sent to David Kim (E-103) for the log wipe.";
+        c.condition.sql_must_contain = {"BANK_TRANSFERS", "SHELL-77"};
+        c.condition.result_must_contain_cell = "E-103";
+        m_clues.push_back(c);
+    }
+    {
+        Clue c; c.id = "c7"; c.title = "The Bird Has Flown";
+        c.hint = "Look at emails from EXT-1 right after the transfer.";
+        c.description = "At 04:10, the ApexTech rep confirmed receipt: 'The bird has flown. Funds transferred.' The timeline perfectly matches the bank wire.";
+        c.condition.sql_must_contain = {"EMAILS", "EXT-1"};
+        c.condition.result_must_contain_cell = "The bird has flown";
+        m_clues.push_back(c);
+    }
+    {
+        Clue c; c.id = "c8"; c.title = "The Smoking Gun";
+        c.hint = "Read the decrypted_emails table. Only one message was encrypted.";
+        c.description = "Sarah's decrypted message to ApexTech: 'I am initiating the 1.5GB transfer of Bluebird tonight... David is handling the log wipes.' Absolute proof of collusion.";
+        c.condition.sql_must_contain = {"DECRYPTED_EMAILS"};
+        c.condition.result_must_contain_cell = "David is handling";
+        m_clues.push_back(c);
+    }
+
+    m_app.status = GameStatus::ACTIVE;
+
+    push_narrative(NarrativeType::SYSTEM, "FORENSICS TERMINAL v4.7 — CASE: PROJECT BLUEBIRD — INITIALISED");
+    push_narrative(NarrativeType::MONOLOGUE, "The Project Bluebird prototype was stolen from the R&D server at 03:45 AM.");
+    push_narrative(NarrativeType::MONOLOGUE, "An external competitor is paying millions for it. We need to find the internal leak.");
+    push_narrative(NarrativeType::HINT, "Start with network_logs. Look for data spikes that match the size of the prototype (1500MB).");
+}
 

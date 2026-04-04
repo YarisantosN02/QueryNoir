@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 #include "RenderCommon.h"
+#include "CaseManager.h"
 #include <cstring>
 #include <sstream>
 
@@ -89,12 +90,23 @@ void draw_top_bar(){
     float ty = (TOP_H - ImGui::GetTextLineHeight()) * 0.5f;
     ImGui::SetCursorPosY(ty);
 
-    ImGui::TextColored(C_NEON(p), "◈"); ImGui::SameLine();
-    ImGui::TextColored(C_TEXT(0.88f), "QUERY NOIR"); ImGui::SameLine();
-    ImGui::TextColored(C_DIM(0.22f), "|"); ImGui::SameLine();
-    ImGui::TextColored(C_DIM(0.55f), "CASE:"); ImGui::SameLine(0,4);
-    ImGui::TextColored(C_NEON(0.82f), "ORION MURDER"); ImGui::SameLine();
-    ImGui::TextColored(C_DIM(0.22f), "|"); ImGui::SameLine();
+ImGui::TextColored(C_NEON(p), "◈"); ImGui::SameLine();
+ImGui::TextColored(C_TEXT(0.88f), "QUERY NOIR"); ImGui::SameLine();
+ImGui::TextColored(C_DIM(0.22f), "|"); ImGui::SameLine();
+ImGui::TextColored(C_DIM(0.55f), "CASE:"); ImGui::SameLine(0, 4);
+static int current_case_idx = 0;
+const char* cases[] = { "ORION MURDER", "PROJECT BLUEBIRD" };
+ImGui::PushStyleColor(ImGuiCol_Text, C_NEON(0.82f)); 
+ImGui::SetNextItemWidth(180.f);
+
+if (ImGui::Combo("##case_combo", &current_case_idx, cases, IM_ARRAYSIZE(cases))) {
+    if (current_case_idx == 0) CaseManager::load_case(g_state, "orion");
+    if (current_case_idx == 1) CaseManager::load_case(g_state, "espionage");
+}
+ImGui::PopStyleColor(); // Return to normal text color for the rest of the UI
+
+ImGui::SameLine();
+ImGui::TextColored(C_DIM(0.22f), "|"); ImGui::SameLine();
 
     if(app.status == GameStatus::CASE_SOLVED)
         ImGui::TextColored(C_GREEN(), "✓ CLOSED");
@@ -402,9 +414,8 @@ void draw_accuse_modal(){
 
     ImGui::Spacing(); neon_sep(0.20f); ImGui::Spacing();
     ImGui::PushTextWrapPos(mw - 52.f);
-    ImGui::TextColored(C_TEXT(0.68f),
-        "You have enough evidence. Type the full name of the person "
-        "you believe murdered Marcus Orion. A wrong accusation costs you.");
+    ImGui::TextColored(C_TEXT(0.68f), "%s", 
+        g_state.get_current_case().get_accusation_prompt().c_str());
     ImGui::PopTextWrapPos();
     ImGui::Spacing();
 
@@ -495,28 +506,21 @@ void draw_solved(){
     ImGui::PopStyleColor(3);
 
     ImGui::Spacing();
-    centered("THE ORION MURDER -- RESOLVED", C_TEXT(0.85f));
+    centered(g_state.get_current_case().get_resolved_title().c_str(), C_TEXT(0.85f));
     ImGui::Spacing(); neon_sep(0.14f); ImGui::Spacing();
     ImGui::PushTextWrapPos(mw - 56.f);
-    ImGui::TextColored(C_DIM(0.55f), "CHARGED:");
+        ImGui::TextColored(C_DIM(0.55f), "CHARGED:");
     ImGui::SameLine(0,8);
-    ImGui::TextColored(C_RED(0.90f), "Lena Park -- Senior Data Analyst");
+    ImGui::TextColored(C_RED(0.90f), "%s", g_state.get_current_case().get_charged_name().c_str());
     ImGui::Spacing();
-    ImGui::TextColored(C_DIM(0.42f), "ACCESSORY / CONSPIRACY:");
-    ImGui::SameLine(0,8);
-    ImGui::TextColored(C_RED(0.65f), "Hana Mori (ordered the act)");
+        if (!g_state.get_current_case().get_accessory_name().empty()) {
+        ImGui::TextColored(C_DIM(0.42f), "ACCESSORY / CONSPIRACY:");
+        ImGui::SameLine(0,8);
+        ImGui::TextColored(C_RED(0.65f), "%s", g_state.get_current_case().get_accessory_name().c_str());
+        ImGui::Spacing(); 
+    }
     ImGui::Spacing(); neon_sep(0.10f); ImGui::Spacing();
-    ImGui::TextColored(C_TEXT(0.68f),
-        "Marcus Orion found $1.35M in fraudulent vendor payments routed from "
-        "NovaCorp through ExtShell-LLC to Rex Calloway, looping offshore back "
-        "to Mori. He planned to expose it that night.\n\n"
-        "Mori paid Park $12,000 to stop him. Park modified badge MASTER two "
-        "months prior, giving herself override access she had no right to. "
-        "At 22:15 she messaged an external contact: 'Tonight is the only chance.'\n\n"
-        "She met Marcus in Server Room B-7 at 22:30. He never left.\n\n"
-        "Elena Vasquez received Mori's order at 20:05. She arrived at 23:58 -- "
-        "too late. Park had already used the MASTER override at 02:14.\n\n"
-        "Carl Bremer flagged the badge tampering in January. Vasquez buried the report.");
+    ImGui::TextColored(C_TEXT(0.68f), "%s", g_state.get_current_case().get_resolution_text().c_str());
     ImGui::PopTextWrapPos();
     ImGui::Spacing();
     centered("Justice served.", C_GREEN(p));
@@ -599,9 +603,7 @@ void draw_help(){
     ImGui::Spacing();
     ImGui::TextColored(C_DIM(0.5f), "TO SOLVE:");
     ImGui::Spacing();
-    ImGui::TextColored(C_TEXT(0.62f),
-        "Collect at least 5 pieces of evidence including badge tampering "
-        "and the pre-murder message. Then click ACCUSE and name the killer.");
+    ImGui::TextColored(C_TEXT(0.62f), "%s", g_state.get_current_case().help_objective.c_str());
     ImGui::PopTextWrapPos();
     ImGui::Spacing();
 
