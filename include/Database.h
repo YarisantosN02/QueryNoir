@@ -1,9 +1,11 @@
 #pragma once
 #include "Types.h"
 #include <sqlite3.h>
+#include <iostream>
 #include <string>
 #include <vector>
 #include <functional>
+
 
 class Database {
 public:
@@ -16,10 +18,11 @@ public:
 
     QueryResult execute(const std::string& sql);
 
-    // Seeding — called once to create the in-memory case DB
-    bool        seed_case(const Case& c);
-    bool        seed_espionage(const Case& c);
+    QueryResult run_query(const std::string& sql);
 
+    // Seeding — called once to create the in-memory case DB
+   bool seed_from_script(const std::string& sql_script);
+    
     // Introspection
     std::vector<std::string> get_table_names();
     std::vector<std::string> get_column_names(const std::string& table);

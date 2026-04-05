@@ -6,7 +6,7 @@
 #include <map>
 
 // ─── Game Status ──────────────────────────────────────────────────────────────
-enum class GameStatus { ACTIVE, ACCUSE_MODE, CASE_SOLVED, CASE_FAILED };
+enum class GameStatus { ACTIVE, ACCUSE_MODE, PLAYING, CASE_SOLVED, CASE_FAILED };
 
 // ─── Query Result ─────────────────────────────────────────────────────────────
 struct QueryResult {
@@ -28,7 +28,7 @@ struct NarrativeEntry {
 };
 
 // ─── Notification ─────────────────────────────────────────────────────────────
-enum class NotifType { INFO, ERROR_MSG, CLUE, UNLOCK, SUCCESS };
+enum class NotifType { INFO, ERROR_MSG, CLUE, TABLE_UNLOCKED, UNLOCK, SUCCESS };
 
 struct Notification {
     NotifType   type;

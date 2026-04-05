@@ -9,12 +9,12 @@
 #include <algorithm>
 
 // ─── Query input state — declared here, extern'd via RenderCommon.h ───────────
-char        s_qbuf[4096]  = "";
-int         s_hist_idx    = -1;
-bool        s_focus_q     = true;
+char         s_qbuf[4096]  = "";
+int          s_hist_idx    = -1;
+bool         s_focus_q     = true;
 QueryResult s_result;
-bool        s_has_result  = false;
-int         s_prev_qbuf_len = 0;
+bool         s_has_result  = false;
+int          s_prev_qbuf_len = 0;
 
 // Cell expand popup state (private to this TU)
 static std::string s_popup_cell;
@@ -54,7 +54,7 @@ void draw_center(){
     neon_sep(0.16f);
     ImGui::Spacing();
 
-    // Retrieve the current case ID from the game state
+    // Retrieve the current case ID from the data struct
     std::string current_id = g_state.get_current_case().id; 
     ImGui::TextColored(C_NEON(0.82f), "noir@forensics");
     ImGui::SameLine(0,0); ImGui::TextColored(C_DIM(0.4f),  ":");
@@ -214,10 +214,10 @@ void draw_center(){
     } else {
         int nc = (int)s_result.columns.size();
         if(nc > 0 && ImGui::BeginTable("##rt", nc,
-            ImGuiTableFlags_Borders          |
-            ImGuiTableFlags_RowBg            |
-            ImGuiTableFlags_ScrollX          |
-            ImGuiTableFlags_ScrollY          |
+            ImGuiTableFlags_Borders            |
+            ImGuiTableFlags_RowBg              |
+            ImGuiTableFlags_ScrollX            |
+            ImGuiTableFlags_ScrollY            |
             ImGuiTableFlags_SizingFixedFit   |
             ImGuiTableFlags_NoHostExtendX,
             {-1, rh}))
@@ -258,7 +258,8 @@ void draw_center(){
                     ImGui::PushStyleColor(ImGuiCol_Text,
                         flag ? C_RED(0.82f) : C_TEXT(0.78f));
 
-                    char sel_id[32];
+                    // Buffer size increased to 64 to avoid snprintf warning
+                    char sel_id[64];
                     snprintf(sel_id, sizeof(sel_id), "##c%zu_%zu", ri, ci);
                     if(ImGui::Selectable((display + sel_id).c_str(),
                         false, ImGuiSelectableFlags_None, {130.f,0.f}))
@@ -292,9 +293,9 @@ void draw_center(){
                 ImGui::SetNextWindowSize({popup_w, 0});
                 ImGui::TextColored(C_NEON(0.7f), "CELL CONTENTS");
                 ImGui::SameLine(popup_w - 60.f);
-                ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0,0,0,0));
+                ImGui::PushStyleColor(ImGuiCol_Button,          ImVec4(0,0,0,0));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.f,.3f,.3f,.2f));
-                ImGui::PushStyleColor(ImGuiCol_Text,          C_DIM(0.5f));
+                ImGui::PushStyleColor(ImGuiCol_Text,           C_DIM(0.5f));
                 if(ImGui::Button("✕##cpclose")) ImGui::CloseCurrentPopup();
                 ImGui::PopStyleColor(3);
                 ImGui::Separator(); ImGui::Spacing();
