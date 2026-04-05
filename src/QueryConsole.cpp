@@ -18,6 +18,9 @@ int          s_prev_qbuf_len = 0;
 
 // Cell expand popup state (private to this TU)
 static std::string s_popup_cell;
+static std::string s_last_query = "";
+static std::vector<std::string> query_history;  
+static bool show_history_placeholder = true; 
 
 // ─────────────────────────────────────────────────────────────────────────────
 void draw_center(){
@@ -62,73 +65,113 @@ void draw_center(){
     ImGui::SameLine(0,0); ImGui::TextColored(C_DIM(0.55f), "$ ");
     ImGui::SameLine(0,6);
 
-    const float btn_w = 108.f;
-    float iw = ImGui::GetContentRegionAvail().x - btn_w - 10.f;
-    ImGui::SetNextItemWidth(iw);
-
-    ImGui::PushStyleColor(ImGuiCol_FrameBg,
-        ImVec4(0.005f,0.010f,0.028f,1.f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,
-        ImVec4(0.f,0.831f,1.f,0.05f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgActive,
-        ImVec4(0.f,0.831f,1.f,0.09f));
-    ImGui::PushStyleColor(ImGuiCol_Border,
-        g_state.app().query_executing ? C_NEON(0.9f) : C_NEON(0.28f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,    {10.f,7.f});
-
-    if(s_focus_q){ ImGui::SetKeyboardFocusHere(); s_focus_q = false; }
 
     // History navigation callback
     auto hcb = [](ImGuiInputTextCallbackData* d) -> int {
-        auto& H = g_state.history();
-        if(H.empty()) return 0;
+        extern std::vector<std::string> query_history;  // Our history
+        if(query_history.empty()) return 0;
         if(d->EventKey == ImGuiKey_UpArrow)
-            s_hist_idx = std::min(s_hist_idx+1, (int)H.size()-1);
+            s_hist_idx = std::min(s_hist_idx+1, (int)query_history.size()-1);
         else if(d->EventKey == ImGuiKey_DownArrow)
             s_hist_idx = std::max(s_hist_idx-1, -1);
         if(s_hist_idx >= 0){
-            int i = (int)H.size()-1-s_hist_idx;
+            int i = (int)query_history.size()-1-s_hist_idx;
             d->DeleteChars(0, d->BufTextLen);
-            d->InsertChars(0, H[i].c_str());
+            d->InsertChars(0, query_history[i].c_str());
         } else {
             d->DeleteChars(0, d->BufTextLen);
         }
         return 0;
     };
 
+
+    // ── INPUT + EXECUTE + HISTORY LAYOUT ─────────────────────────────────────
+    const float input_section_width = ImGui::GetContentRegionAvail().x;
+    const float btn_w = 108.f;
+    
+    ImGui::BeginGroup();
+    
+    // INPUT (left - full width minus button)
+    float iw = input_section_width - btn_w - 20.f;
+    ImGui::SetNextItemWidth(iw);
+    
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.005f,0.010f,0.028f,1.f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.f,0.831f,1.f,0.05f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.f,0.831f,1.f,0.09f));
+    ImGui::PushStyleColor(ImGuiCol_Border, g_state.app().query_executing ? C_NEON(0.9f) : C_NEON(0.28f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {10.f,7.f});
+    
+    if(s_focus_q){ ImGui::SetKeyboardFocusHere(); s_focus_q = false; }
     bool enter = ImGui::InputText("##qi", s_qbuf, sizeof(s_qbuf),
-        ImGuiInputTextFlags_EnterReturnsTrue |
-        ImGuiInputTextFlags_CallbackHistory, hcb);
-
+        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory, hcb);
+    
     ImGui::PopStyleColor(4); ImGui::PopStyleVar(2);
-    ImGui::SameLine(0,10);
-
-    // Execute button
+    
+    // EXECUTE (right)
+    ImGui::SameLine();
     bool exec_click = false;
     {
         float ep = UITheme::pulse(2.2f, 0.65f, 1.f);
-        ImGui::PushStyleColor(ImGuiCol_Button,
-            ImVec4(0.f,0.831f,1.f,0.10f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-            ImVec4(0.f,0.831f,1.f,0.22f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-            ImVec4(0.f,0.831f,1.f,0.40f));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f,0.831f,1.f,0.10f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.f,0.831f,1.f,0.22f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.f,0.831f,1.f,0.40f));
         ImGui::PushStyleColor(ImGuiCol_Text, C_NEON(ep));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,    {0.f,7.f});
-        exec_click = ImGui::Button("EXECUTE ▶", {btn_w,-1});
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0.f,7.f});
+        exec_click = ImGui::Button("EXECUTE ▶", {btn_w, 0});
         ImGui::PopStyleColor(4); ImGui::PopStyleVar(2);
     }
+    ImGui::EndGroup();
+    
+    // HISTORY BELOW INPUT (perfect alignment)
+    ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
+    
+    float history_height = ImGui::GetContentRegionAvail().y * 0.90f; 
+    history_height = std::max(history_height, 140.0f);  
+    
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.015f, 0.025f, 0.045f, 0.6f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+    ImGui::PushStyleColor(ImGuiCol_Border, C_NEON(0.25f));
+    
+    if(ImGui::BeginChild("##query_history", ImVec2(0, history_height), true)) {
+        ImGui::TextColored(C_PURPLE(0.75f), "QUERY HISTORY (%zu)", query_history.size());
+        ImGui::Spacing();
+        if(query_history.empty()) {
+            ImGui::TextColored(C_DIM(0.4f), "No queries executed yet...");
+        } else {
+            for(int i = (int)query_history.size() - 1; i >= 0; i--) {
+                char label[1024];
+                std::string display = query_history[i];
+                if(display.length() > 85) display = display.substr(0, 82) + "...";
+                snprintf(label, sizeof(label), "▸ %s##h%d", display.c_str(), i);
+                if(ImGui::Selectable(label)) {
+                    strncpy(s_qbuf, query_history[i].c_str(), sizeof(s_qbuf)-1);
+                    s_qbuf[sizeof(s_qbuf)-1] = '\0';
+                    s_focus_q = true;
+                }
+            }
+        }
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar();
+
+//_______________________________________________________________________________________________________________________
 
     // Run the query
     if((enter || exec_click) && strlen(s_qbuf) > 0){
         g_state.app().glitch_timer = 0.18f;
         Audio::get().play(SFX::EXECUTE);
         Audio::get().play(SFX::GLITCH, 0.4f);
-        s_result     = g_state.run_query(s_qbuf);
+        
+        // ADD TO OUR LOCAL HISTORY 
+        query_history.push_back(s_qbuf);
+        show_history_placeholder = false;  // Hide placeholder
+        
+        s_result = g_state.run_query(s_qbuf);
         s_has_result = true;
-        s_hist_idx   = -1;
+        s_hist_idx = -1;
         if(s_result.is_error) Audio::get().play(SFX::ERROR_BEEP);
     }
 
@@ -139,6 +182,16 @@ void draw_center(){
             Audio::get().play(SFX::KEYCLICK, 0.45f);
             s_prev_qbuf_len = cur_len;
         }
+    }
+
+    
+    // Hover tooltip for full query
+    if(ImGui::IsItemHovered() && !s_last_query.empty()) {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(400);
+        ImGui::TextUnformatted(s_last_query.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
     }
 
     // Executing indicator
