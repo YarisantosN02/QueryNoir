@@ -310,6 +310,7 @@ public:
     virtual void check_unlocks(GameState& state, const std::string& sql, const QueryResult& result) override {
     std::string up = GameState::upper(sql);
 
+
     // badge_registry unlocks when player queries access_logs
     if (GameState::sql_has(up,"ACCESS_LOGS") &&
         (GameState::result_has_cell(result,"MASTER") || GameState::result_has_cell(result,"AFTER_HOURS")
@@ -528,6 +529,7 @@ public:
     virtual bool seed_data(Database& db) override {
         auto result = db.run_query(get_sql_script());
         return !result.is_error;
+        
 }
 
 };

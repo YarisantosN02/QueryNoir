@@ -31,10 +31,17 @@ std::string GameState::upper(const std::string& s) {
 bool GameState::sql_has(const std::string& up, const std::string& kw) {
     return up.find(upper(kw)) != std::string::npos;
 }
+
 bool GameState::result_has_cell(const QueryResult& r, const std::string& sub) {
-    for (auto& row:r.rows)
-        for (auto& cell:row)
-            if (cell.find(sub)!=std::string::npos) return true;
+    std::string sub_up = upper(sub); // Uppercase the keyword we are looking for
+    for (const auto& row : r.rows) {
+        for (const auto& cell : row) {
+            // Uppercase the cell data before checking
+            if (upper(cell).find(sub_up) != std::string::npos) {
+                return true;
+            }
+        }
+    }
     return false;
 }
 
@@ -173,8 +180,6 @@ void GameState::check_puzzles(const std::string& sql, const QueryResult& result)
 void GameState::check_unlocks(const std::string& sql, const QueryResult& result) {
     if (result.is_error || result.rows.empty()) return;
     
-    // The engine no longer knows the rules! 
-    // It just asks the currently loaded case to check the rules.
     if (m_current_case_ptr != nullptr) {
         m_current_case_ptr->check_unlocks(*this, sql, result);
     }
@@ -307,9 +312,29 @@ void GameState::unlock_table(const std::string& name) {
         if (t.name == name && !t.unlocked) {
             t.unlocked = true;
             
-            // If NotifType::TABLE_UNLOCKED fails, use NotifType::CLUE or NotifType::SUCCESS
-            push_notification(NotifType::TABLE_UNLOCKED, "ACCESS GRANTED: " + t.display_name);
+            // Fetch the exact row count dynamically
+            QueryResult count_res = m_db.run_query("SELECT COUNT(*) FROM " + t.name);
+            if (!count_res.is_error && !count_res.rows.empty() && !count_res.rows[0].empty()) {
+                try {
+                    t.row_count = std::stoi(count_res.rows[0][0]);
+                } catch (...) {
+                    t.row_count = 0;
+                }
+            }
+
+            // Fetch the column names and data types dynamically
+            if (t.columns.empty()) {
+                QueryResult pragma_res = m_db.run_query("PRAGMA table_info(" + t.name + ")");
+                if (!pragma_res.is_error) {
+                    for (const auto& row : pragma_res.rows) {
+                        if (row.size() >= 3) {
+                            t.columns.push_back({row[1], row[2], ""});
+                        }
+                    }
+                }
+            }
             
+            push_notification(NotifType::TABLE_UNLOCKED, "ACCESS GRANTED: " + t.display_name);
             push_narrative(NarrativeType::SUCCESS, "Decryption complete. Table '" + t.name + "' is now readable.");
             if (m_unlock_cb) m_unlock_cb(t);
             return;
